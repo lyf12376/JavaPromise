@@ -720,7 +720,7 @@ public class Promise<T> {
                         fail(reason);
                     }
                 };
-                job.Do(resolver, rejector, new PromiseState<>(scopeCancelledBroadcast, cancelledBroadcast, Promise.this));
+                job.Do(resolver, rejector, new PromiseState<>(cancelledBroadcast, Promise.this));
             } catch (Throwable e) {
                 fail(e);
             }
