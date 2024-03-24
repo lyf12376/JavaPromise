@@ -249,7 +249,10 @@ class Promise<RESULT> private constructor(
         }
     }
 
-    fun <NEXT_RESULT> then(onSucceeded: SucceededHandler<RESULT, NEXT_RESULT>) =
+    fun <NEXT_RESULT> then(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onSucceeded: SucceededHandler<RESULT, NEXT_RESULT>
+    ) =
             Promise(scopeCancelledBroadcast) next@{
                 state().self.transfer(
                         this@Promise,
@@ -258,12 +261,18 @@ class Promise<RESULT> private constructor(
                 waiting()
             }
 
-    fun next(onSucceeded: SucceededConsumer<RESULT>) = then {
+    fun next(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onSucceeded: SucceededConsumer<RESULT>
+    ) = then(scopeCancelledBroadcast) {
         onSucceeded()
         rsv(null)
     }
 
-    fun <NEXT_RESULT> catch(onFailed: FailedHandler<NEXT_RESULT>) =
+    fun <NEXT_RESULT> catch(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onFailed: FailedHandler<NEXT_RESULT>
+    ) =
             Promise(scopeCancelledBroadcast) next@{
                 state().self.transfer(
                         this@Promise,
@@ -272,12 +281,18 @@ class Promise<RESULT> private constructor(
                 waiting()
             }
 
-    fun recover(onFailed: FailedConsumer) = catch {
+    fun recover(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onFailed: FailedConsumer
+    ) = catch(scopeCancelledBroadcast) {
         onFailed()
         rsv(null)
     }
 
-    fun <NEXT_RESULT> forCancel(onCancelled: CancelledListener) =
+    fun <NEXT_RESULT> forCancel(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onCancelled: CancelledListener
+    ) =
             Promise<NEXT_RESULT>(scopeCancelledBroadcast) next@{
                 state().self.transfer(
                         this@Promise,
@@ -286,7 +301,10 @@ class Promise<RESULT> private constructor(
                 waiting()
             }
 
-    fun finally(onFinally: FinallyHandler<RESULT>) =
+    fun finally(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onFinally: FinallyHandler<RESULT>
+    ) =
             Promise<RESULT>(scopeCancelledBroadcast) next@{
                 state().self.transfer(
                         this@Promise,
@@ -295,7 +313,10 @@ class Promise<RESULT> private constructor(
                 waiting()
             }
 
-    fun last(onFinally: FinallyConsumer<RESULT>) = finally {
+    fun last(
+            scopeCancelledBroadcast: PromiseCancelledBroadcast?,
+            onFinally: FinallyConsumer<RESULT>
+    ) = finally(scopeCancelledBroadcast) {
         onFinally()
         forward()
     }
@@ -325,8 +346,12 @@ fun Job.toPromiseScope(): PromiseScope = run {
     }
 }
 
-fun <RESULT> PromiseScope.promise(job: PromiseJob<RESULT>) = Promise(scopeCancelledBroadcast, job)
 fun <RESULT> Job.promise(job: PromiseJob<RESULT>) = toPromiseScope().promise(job)
 
-fun job(builder: Job.() -> Unit): Job = Job().apply(builder)
-fun <RESULT> process(builder: Job.() -> Promise<RESULT>): Promise<RESULT> = builder(Job())
+fun job(builder: PromiseScope.() -> Unit): Job = Job().apply {
+    builder(toPromiseScope())
+}
+
+fun <RESULT> process(builder: PromiseScope.() -> Promise<RESULT>): Promise<RESULT> = Promise {
+    rsp(builder())
+}

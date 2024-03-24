@@ -1,7 +1,6 @@
 import kotlinx.coroutines.*
 import org.junit.jupiter.api.Test
 import pub.telephone.javapromise.async.kpromise.job
-import pub.telephone.javapromise.async.kpromise.promise
 import java.util.*
 import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
@@ -96,9 +95,10 @@ class TestKPromise {
                 }
                 println("【${time}】cancelled here 2")
             }
+        }.apply {
             GlobalScope.launch {
                 delay(8500.milliseconds)
-                this@job.cancel()
+                this@apply.cancel()
             }
         }
         runBlocking { delay(60.seconds) }
