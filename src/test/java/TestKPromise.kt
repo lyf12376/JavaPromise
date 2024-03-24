@@ -41,7 +41,7 @@ class TestKPromise {
                 rsv("【${time}】say hello to the world")
             }.catch<Any?> {
                 try {
-//                    delay(1.seconds)
+                    delay(10.seconds)
                 } catch (e: Throwable) {
 //                    println("$e")
                     e.printStackTrace()
@@ -61,7 +61,7 @@ class TestKPromise {
                 throw reason
             }.finally {
                 try {
-                    delay(1.seconds)
+                    delay(10.seconds)
                 } catch (e: Throwable) {
 //                    println("$e")
                     e.printStackTrace()
@@ -70,8 +70,9 @@ class TestKPromise {
                 rsp(promise {
                     delay(1.seconds)
                     rsp(promise {
+                        println("调用A")
                         delay(1.seconds)
-                        println("调用")
+                        println("调用B")
                         rej(IndexOutOfBoundsException())
                     })
                 })
@@ -97,7 +98,7 @@ class TestKPromise {
             }
             GlobalScope.launch {
                 delay(8500.milliseconds)
-//                this@job.cancel()
+                this@job.cancel()
             }
         }
         runBlocking { delay(60.seconds) }

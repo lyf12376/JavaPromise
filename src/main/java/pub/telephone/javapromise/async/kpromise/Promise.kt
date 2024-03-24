@@ -153,25 +153,19 @@ class Promise<RESULT> private constructor(
         val s = PromiseState(this)
         op(object : ForwardPack<RESULT>, PromiseCancelledBroadcast by cancelledBroadcast {
             override suspend fun rsv(v: RESULT): JobResult {
-                return withContext(NonCancellable) {
-                    fixedPromise?.get()?.run {
-                        forward()
-                    } ?: succeed(v)
-                    JobResult.INSTANCE
-                }
+                fixedPromise?.get()?.run {
+                    forward()
+                } ?: succeed(v)
+                return JobResult.INSTANCE
             }
 
             override suspend fun rsp(p: Promise<RESULT>): JobResult {
-                return withContext(NonCancellable) {
-                    transfer(p, fixedPromise)
-                    JobResult.INSTANCE
-                }
+                transfer(p, fixedPromise)
+                return JobResult.INSTANCE
             }
 
             override suspend fun forward(): JobResult {
-                return withContext(NonCancellable) {
-                    rsp(fixedPromise!!.getAndSet(null)!!)
-                }
+                return rsp(fixedPromise!!.getAndSet(null)!!)
             }
 
             override fun state(): PromiseState<RESULT> {
@@ -195,10 +189,36 @@ class Promise<RESULT> private constructor(
             onCancelled: CancelledListener = {},
             onFinally: FinallyHandler<ANOTHER>? = null,
     ) {
-        withContext(NonCancellable) {
-            val fixedPromiseF: AtomicReference<Promise<RESULT>>? =
-                    if (onFinally != null) AtomicReference(from as Promise<RESULT>) else fixedPromise
+        val fixedPromiseF: AtomicReference<Promise<RESULT>>? =
+                if (onFinally != null) AtomicReference(from as Promise<RESULT>) else fixedPromise
+        var selfCancelled = false
+        try {
             from.awaitSettled()
+        } catch (e: CancellationException) {
+            selfCancelled = true
+        }
+        val runCancelCallback: suspend (Boolean) -> Unit = { isSelfCancelled ->
+            perform(fixedPromiseF) perform@{
+                val callback: suspend () -> Unit = {
+                    if (onFinally != null) {
+                        onFinally(this@perform as ForwardPack<ANOTHER>)
+                    } else {
+                        onCancelled()
+                    }
+                }
+                if (isSelfCancelled) {
+                    withContext(NonCancellable) {
+                        callback()
+                    }
+                } else {
+                    this@Promise.cancel()
+                    callback()
+                }
+            }
+        }
+        if (selfCancelled) {
+            runCancelCallback(true)
+        } else {
             when (from.status.get()) {
                 null -> throw Throwable()
                 Status.RUNNING -> throw Throwable()
@@ -224,14 +244,7 @@ class Promise<RESULT> private constructor(
                     }
                 }
 
-                Status.CANCELLED -> perform(fixedPromiseF) perform@{
-                    this@Promise.cancel()
-                    if (onFinally != null) {
-                        onFinally(this@perform as ForwardPack<ANOTHER>)
-                    } else {
-                        onCancelled()
-                    }
-                }
+                Status.CANCELLED -> runCancelCallback(false)
             }
         }
     }
