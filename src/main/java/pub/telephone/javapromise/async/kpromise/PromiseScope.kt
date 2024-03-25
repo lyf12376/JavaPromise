@@ -30,4 +30,7 @@ interface PromiseScope {
     fun <RESULT> Promise<RESULT>.last(
             onFinally: FinallyConsumer<RESULT>
     ) = last(scopeCancelledBroadcast, onFinally)
+    fun <RESULT> race(vararg promises: Promise<RESULT>) = Promise.race(scopeCancelledBroadcast, *promises)
+
+
 }

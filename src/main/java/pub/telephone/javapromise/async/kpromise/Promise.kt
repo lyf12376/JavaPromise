@@ -114,6 +114,8 @@ class Promise<RESULT> private constructor(
     // 此字段必须放在最后一个，因为 cancel 方法可能会被立即调用
     private val scopeUnListenKey = scopeCancelledBroadcast?.listen(::cancel)
 
+
+
     private fun settle(status: Status, op: () -> Unit = {}) {
         submit.trySend(null).takeIf { it.isSuccess }?.run {
             op()
@@ -319,6 +321,33 @@ class Promise<RESULT> private constructor(
     ) = finally(scopeCancelledBroadcast) {
         onFinally()
         forward()
+    }
+
+    suspend fun result(): RESULT {
+        awaitSettled()
+        return when (status.get()) {
+                Status.SUCCEED -> value!!
+                Status.FAILED -> throw reason!!
+                Status.CANCELLED -> throw CancellationException("Promise was cancelled")
+                Status.RUNNING-> throw IllegalStateException()
+                null -> throw IllegalStateException()
+            }
+    }
+
+
+    companion object {
+        fun <RESULT> race(scopeCancelledBroadcast: PromiseCancelledBroadcast?, vararg promises: Promise<RESULT>): Promise<RESULT> {
+            return Promise(scopeCancelledBroadcast){
+                rsp(select {
+                    promises.forEach {p->
+                        p.settled.onReceiveCatching{
+                            p
+                        }
+                    }
+                })
+            }
+        }
+
     }
 }
 
