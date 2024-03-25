@@ -21,7 +21,7 @@ class MyTest {
                 rsv(123) // 任务完成，返回结果
             }
             val a = measureTimeMillis {
-                val sum = promise.getResult().toString().toInt() + promise1.getResult().toString().toInt()
+                val sum = promise.result().toString().toInt() + promise1.result().toString().toInt()
             }
 
             println(a)
